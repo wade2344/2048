@@ -1,0 +1,16 @@
+{
+  "name": "@infinite/simulator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@infinite/game-engine": "workspace:*",
+    "@infinite/game-config": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
+  }
+}

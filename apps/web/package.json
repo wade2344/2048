@@ -1,0 +1,17 @@
+{
+  "name": "@infinite/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@infinite/game-engine": "workspace:*",
+    "@infinite/game-config": "workspace:*",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "vite": "catalog:"
+  }
+}
