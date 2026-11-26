@@ -10,7 +10,7 @@ pnpm check
 pnpm dev
 ```
 
-Web 显示工程预览。执行 `pnpm simulate` 可检查命令行应用是否通过公共包建立空棋盘。
+Web 打开经典 4×4 棋盘。按方向键或在棋盘内滑动即可移动方块，顶部显示分数、步数和重新开始按钮。执行 `pnpm simulate` 可检查命令行应用是否通过公共包建立空棋盘。
 
 每次开始或交接开发前，请读[开发交接记录](docs/development/HANDOFF.md)。
 
