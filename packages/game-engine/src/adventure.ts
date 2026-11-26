@@ -1,4 +1,4 @@
-import { defaultEnergy, skills, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
+import { beneficialProtocols, type BeneficialProtocol, defaultEnergy, skills, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
 import { energyAfterSlide, startLevelEnergy, useSkillEnergy } from './energy'
 import { enterLevel, spawnOrdinaryTile, type Opening } from './generation'
 import { goalReached } from './goal'
@@ -8,6 +8,7 @@ import type { RandomSnapshot } from './random'
 type OrdinaryGoal = Exclude<NodeGoal, { kind: 'boss' }>
 
 export interface OrdinaryNodeState {
+  readonly protocol: BeneficialProtocol | null
   readonly owned: readonly SkillId[]
   readonly goal: OrdinaryGoal
   readonly board: AdventureBoard
@@ -36,8 +37,28 @@ export function startOrdinaryNode(random: RandomSnapshot, goal: OrdinaryGoal, op
     ? { ...opening, skillTiles: [...opening.skillTiles, spawnTuning.preloadValue] } : opening
   const { board, nextId, random: afterOpening, cleared } = enterLevel(random, bonuses,
     board => completed(goal, board, 0, 0), firstId, owned.includes('advanced-spawn'))
-  return { owned: [...owned], goal, board, nextId, random: afterOpening, cleared, energyRules,
+  return { protocol: null, owned: [...owned], goal, board, nextId, random: afterOpening, cleared, energyRules,
     energy: startLevelEnergy(energyRules), nodeScore: 0, validMoves: 0 }
+}
+
+/** Enter with the already selected protocol; selection and its RNG belong to preparation. */
+export function enterBeneficialNode(random: RandomSnapshot, goal: OrdinaryGoal, options: {
+  readonly protocol: BeneficialProtocol
+  readonly firstId: number
+  readonly owned: readonly SkillId[]
+}): OrdinaryNodeState {
+  const { protocol, firstId, owned } = options
+  const rules = { ...defaultEnergy }
+  const protocolTiles: number[] = []
+  switch (protocol) {
+    case 'energy-surge': rules.initial = beneficialProtocols[protocol].initialEnergy; break
+    case 'capacity-boost': rules.capacity = beneficialProtocols[protocol].capacity; break
+    case 'advanced-cache': protocolTiles.push(beneficialProtocols[protocol].openingTile); break
+    case 'turbo-mode': break
+    default: throw new RangeError('Unknown beneficial protocol')
+  }
+  const opening = { obstacles: [], skillTiles: [], protocolTiles }
+  return { ...startOrdinaryNode(random, goal, opening, rules, firstId, owned), protocol }
 }
 
 export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction) {
@@ -46,7 +67,9 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   }
   const move = moveBoard(state.board, direction)
   if (!move.changed) return { accepted: false as const, state }
-  const nodeScore = state.nodeScore + move.score
+  const mergeScore = state.protocol === 'turbo-mode'
+    ? move.score * beneficialProtocols['turbo-mode'].scoreMultiplier : move.score
+  const nodeScore = state.nodeScore + mergeScore
   const validMoves = state.validMoves + 1
   const energy = energyAfterSlide(state.energy, move.events, state.energyRules)
   const next = spawnOrdinaryTile({ ...state, board: move.board }, state.owned.includes('advanced-spawn'))
