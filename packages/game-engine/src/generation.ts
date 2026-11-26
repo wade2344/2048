@@ -61,12 +61,16 @@ export function enterLevel(random: RandomSnapshot, opening: Opening,
   return {board: state.board, random: state.random, nextId: state.nextId, spawned, cleared: meetsGoal(state.board)}
 }
 
+export function spawnOrdinaryTile<T extends Tile | Obstacle>(state: GridState<T>) {
+  return place(state)
+}
+
 /** Ordinary tiles only. Boss damage and obstacle segments belong to their own rule stages. */
 export function ordinaryMove(state: GridState<Tile>, direction: Direction,
   meetsGoal: (board: Board, baseScore: number) => boolean) {
   const move = moveBoard(state.board, direction)
   if (!move.changed) return { accepted: false as const, state }
-  const next = place({...state, board: move.board})
+  const next = spawnOrdinaryTile({...state, board: move.board})
   return { accepted: true as const, state: { board: next.board, random: next.random, nextId: next.nextId },
     events: [...move.events, {type: 'TILE_SPAWNED' as const, ...next.spawned}],
     score: move.score, cleared: meetsGoal(next.board, move.score) }
