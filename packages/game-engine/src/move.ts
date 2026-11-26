@@ -1,0 +1,56 @@
+export type Direction = 'left' | 'right' | 'up' | 'down'
+export interface Tile { readonly id: string; readonly value: number }
+export type Board = readonly (readonly (Tile | null)[])[]
+type Position = readonly [row: number, column: number]
+type Event =
+  | { type: 'TILE_MOVED'; id: string; from: Position; to: Position }
+  | { type: 'TILE_MERGED'; ids: readonly [string, string]; to: Position; value: number }
+
+function position(line: number, offset: number, direction: Direction): Position {
+  switch (direction) {
+    case 'left': return [line, offset]
+    case 'right': return [line, 3 - offset]
+    case 'up': return [offset, line]
+    case 'down': return [3 - offset, line]
+  }
+}
+
+/** Pure movement kernel for an ordinary, already validated 4x4 board. */
+export function moveBoard(board: Board, direction: Direction) {
+  if (board.length !== 4 || board.some(row => row.length !== 4)) {
+    throw new RangeError('Expected a 4x4 board')
+  }
+  const result = board.map(row => row.map((): Tile | null => null))
+  const events: Event[] = []
+  let score = 0
+  for (let line = 0; line < 4; line++) {
+    const occupied: { tile: Tile; from: Position }[] = []
+    for (let offset = 0; offset < 4; offset++) {
+      const from = position(line, offset, direction)
+      const tile = board[from[0]]![from[1]]
+      if (tile) occupied.push({ tile, from })
+    }
+    let write = 0
+    for (let read = 0; read < occupied.length; read++) {
+      const first = occupied[read]!
+      const next = occupied[read + 1]
+      const to = position(line, write++, direction)
+      let output = first.tile
+      const merge = next && first.tile.value === next.tile.value
+      for (const entry of merge ? [first, next] : [first]) {
+        if (entry.from[0] !== to[0] || entry.from[1] !== to[1]) {
+          events.push({ type: 'TILE_MOVED', id: entry.tile.id, from: entry.from, to })
+        }
+      }
+      if (merge) {
+        output = { id: first.tile.id, value: first.tile.value * 2 }
+        score += output.value
+        events.push({ type: 'TILE_MERGED', ids: [first.tile.id, next.tile.id], to, value: output.value })
+        read++
+      }
+      result[to[0]]![to[1]] = output
+    }
+  }
+  const changed = events.length > 0
+  return { board: changed ? result : board, changed, score, events }
+}
