@@ -65,3 +65,7 @@ pnpm balance:compare --baseline v1 --candidate v2
 禁止把 UndoSnapshot、原始 Seed 或能反推出未来的完整记录交给 Bot。公开状态筛选应有泄漏测试；合法动作列表不能暗中编码未来随机结果。合法动作与「可恢复死局」的搜索边界由 D08 决定。
 
 CI 阶段和规模见 [CI-CD](../development/CI-CD.md)；体验与人工采样见 [BALANCE](../game-design/BALANCE.md)。未运行实验，不提供虚构通关率。
+
+## 首关实验入口（2026-11-27）
+
+仓库根目录运行 `pnpm simulate --agent random --runs 100` 或 `pnpm simulate --agent greedy --runs 100`。当前 CLI 模拟首关合成 32，种子可用 `--seed` 与 `--policy-seed` 分别指定，每局各自递增。每局默认最多 1000 次操作、5000 毫秒；可用 `--max-moves` 和 `--timeout-ms` 调整。最后一行标准输出是 JSON 报告。Greedy 按生成前的合并基础分选方向，用独立策略随机流打破平局。完整六关实验、Strategic 和参数对照仍待开发。
