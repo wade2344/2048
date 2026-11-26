@@ -3,8 +3,8 @@ import { adventureNodes } from '@infinite/game-config'
 import { createRandomSnapshot, legalSingleTargets, startOrdinaryNode, useSingleTargetSkill } from './index'
 
 const state = { ...startOrdinaryNode(createRandomSnapshot(42), adventureNodes[1].goal,
-  { obstacles: [[0,0]], skillTiles: [32], protocolTiles: [] }), energy: 6 }
-const context = { owned: ['targeted-overclock','data-clear'], lockedTileIds: ['2'] } as const
+  { obstacles: [[0,0]], skillTiles: [32], protocolTiles: [] }, undefined, 1, ['targeted-overclock','data-clear']), energy: 6 }
+const context = { lockedTileIds: ['2'] } as const
 const cast = { type: 'USE_SKILL', skillId: 'targeted-overclock', targets: ['3'] } as const
 const clear = { ...cast, skillId: 'data-clear' } as const
 
@@ -36,5 +36,6 @@ test('enumeration and confirmation both enforce ownership, balance, locks and ph
     expect(legalSingleTargets(current, context, cast.skillId)).toEqual([])
     expect(useSingleTargetSkill(current, context, cast).state).toBe(current)
   }
-  expect(useSingleTargetSkill(state, { ...context, owned:[] }, cast).state).toBe(state)
+  const untrained = { ...state, owned:[] }
+  expect(useSingleTargetSkill(untrained, context, cast).state).toBe(untrained)
 })

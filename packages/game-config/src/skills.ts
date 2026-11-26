@@ -15,3 +15,11 @@ export const skills = [
 ] as const
 
 export type SkillId = typeof skills[number]['id']
+
+/** Baseline generation weights and fixed opening bonus, pending balance validation. */
+export const spawnTuning = {
+  totalWeight: 10,
+  baseFourWeight: 1,
+  advancedFourWeight: 3,
+  preloadValue: 8,
+} as const

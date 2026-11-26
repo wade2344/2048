@@ -1,3 +1,4 @@
+import { spawnTuning } from '@infinite/game-config'
 import { moveBoard, type Board, type Direction, type Obstacle, type Tile } from './move'
 import { drawIndex, type RandomSnapshot } from './random'
 
@@ -17,7 +18,7 @@ function vacantCells<T>(board: Matrix<T>) {
 }
 
 // Candidate sampling contract: row-major empty cells, position before value.
-function place<T extends Tile | Obstacle>(state: GridState<T>, fixedValue?: number) {
+function place<T extends Tile | Obstacle>(state: GridState<T>, fixedValue?: number, advancedSpawn = false) {
   const empty = vacantCells(state.board)
   if (!empty.length) throw new RangeError('Placement requires an empty cell')
   const location = drawIndex(state.random, 'board', empty.length)
@@ -25,8 +26,8 @@ function place<T extends Tile | Obstacle>(state: GridState<T>, fixedValue?: numb
   let random = location.snapshot
   let value = fixedValue
   if (value === undefined) {
-    const roll = drawIndex(random, 'board', 10)
-    value = roll.value === 0 ? 4 : 2
+    const roll = drawIndex(random, 'board', spawnTuning.totalWeight)
+    value = roll.value < (advancedSpawn ? spawnTuning.advancedFourWeight : spawnTuning.baseFourWeight) ? 4 : 2
     random = roll.snapshot
   }
   const tile: Tile = { id: String(state.nextId), value }
@@ -43,7 +44,7 @@ export interface Opening {
 
 /** Obstacles are selected by the level. Fixed bonuses use their supplied order. */
 export function enterLevel(random: RandomSnapshot, opening: Opening,
-  meetsGoal: (board: Matrix<Tile | Obstacle>) => boolean, firstId = 1) {
+  meetsGoal: (board: Matrix<Tile | Obstacle>) => boolean, firstId = 1, advancedSpawn = false) {
   const board: (Tile | Obstacle | null)[][] = Array.from({length: 4}, () => Array(4).fill(null))
   for (const [r,c] of opening.obstacles) {
     if (!Number.isInteger(r) || !Number.isInteger(c) || board[r]?.[c] !== null) {
@@ -54,15 +55,15 @@ export function enterLevel(random: RandomSnapshot, opening: Opening,
   let state: GridState<Tile | Obstacle> = {board, random, nextId: firstId}
   const spawned = []
   for (const value of [undefined, undefined, ...opening.skillTiles, ...opening.protocolTiles]) {
-    const next = place(state, value)
+    const next = place(state, value, advancedSpawn)
     state = next
     spawned.push(next.spawned)
   }
   return {board: state.board, random: state.random, nextId: state.nextId, spawned, cleared: meetsGoal(state.board)}
 }
 
-export function spawnOrdinaryTile<T extends Tile | Obstacle>(state: GridState<T>) {
-  return place(state)
+export function spawnOrdinaryTile<T extends Tile | Obstacle>(state: GridState<T>, advancedSpawn = false) {
+  return place(state, undefined, advancedSpawn)
 }
 
 /** Ordinary tiles only. Boss damage and obstacle segments belong to their own rule stages. */
