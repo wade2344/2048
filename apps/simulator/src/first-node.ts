@@ -1,5 +1,4 @@
-import { adventureNodes } from '@infinite/game-config'
-import { createRandomSnapshot, drawIndex, moveBoard, slideOrdinaryNode, startOrdinaryNode,
+import { createRandomSnapshot, drawIndex, moveBoard, slideOrdinaryNode, startFirstNode,
   type AdventureBoard, type Direction } from '@infinite/game-engine'
 
 type Agent = 'random' | 'greedy'
@@ -28,8 +27,7 @@ export function simulateFirstNode(seed: number, policySeed: number, agent: Agent
   timeoutMs: number, now = () => performance.now()) {
   const deadline = now() + timeoutMs
   const actions: Direction[] = []
-  let state = startOrdinaryNode(createRandomSnapshot(seed), adventureNodes[0].goal,
-    { obstacles:[], skillTiles:[], protocolTiles:[] })
+  let state = startFirstNode(seed)
   const decide = createAgent(agent, policySeed)
   function finish(outcome: 'won' | 'lost' | 'operationLimit' | 'timeout' | 'invalidAction') {
     return { outcome, seed, policySeed, actions, moves:state.validMoves, score:state.nodeScore, energy:state.energy }

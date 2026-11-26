@@ -1,6 +1,6 @@
 import { createApp, defineComponent, h, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { adventureNodes } from '@infinite/game-config'
-import { createRandomSnapshot, legalSlides, slideClassic, slideOrdinaryNode, startClassic, startOrdinaryNode, type Direction, type OrdinaryNodeState } from '@infinite/game-engine'
+import { firstNodeRecording, startFirstNode, legalSlides, slideClassic, slideOrdinaryNode, startClassic, type Direction, type OrdinaryNodeState } from '@infinite/game-engine'
 import './style.css'
 import { playFeedback } from './feedback'
 
@@ -20,9 +20,21 @@ createApp(defineComponent({
     const node = adventureNodes[0]
     const adventure = shallowRef<OrdinaryNodeState>()
     const mode = shallowRef<'classic' | 'adventure'>('classic')
+    let adventureSeed = 0
+    let successfulMoves: Direction[] = []
+    function exportReplay() {
+      const data = JSON.stringify(firstNodeRecording(adventureSeed, successfulMoves))
+      const url = URL.createObjectURL(new Blob([data], {type:'application/json'}))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = '2048-first-node-' + adventureSeed + '.json'
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
     function newAdventure() {
-      return startOrdinaryNode(createRandomSnapshot(newSeed()), node.goal,
-        { obstacles: [], skillTiles: [], protocolTiles: [] })
+      adventureSeed = newSeed()
+      successfulMoves = []
+      return startFirstNode(adventureSeed)
     }
     function changeMode(next: typeof mode.value) {
       clearFeedback()
@@ -55,6 +67,7 @@ createApp(defineComponent({
       if (mode.value === 'adventure' && adventure.value) {
         const move = slideOrdinaryNode(adventure.value, direction)
         if (!move.accepted) return
+        successfulMoves.push(direction)
         adventure.value = move.state
         events = move.events
       } else {
@@ -107,6 +120,7 @@ createApp(defineComponent({
         h('button', { 'aria-pressed':mode.value === 'classic', onClick:() => changeMode('classic') }, '经典模式'),
         h('button', { 'aria-pressed':!!current, onClick:() => changeMode('adventure') }, '冒险首关'),
       ]),
+      current && h('button', { onClick:exportReplay }, '导出首关回放'),
       current && h('h2', node.name + ' · 合成 ' + node.goal.target),
       h('section', {class:'stats', 'aria-label':'对局统计'}, [
         h('div',[h('span','运算分数'), h('strong', {id:'score'}, current?.nodeScore ?? classic.value.score)]),
