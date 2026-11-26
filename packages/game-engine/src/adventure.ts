@@ -1,8 +1,9 @@
+import { mergeRewards } from './merge-rewards'
 import { shuffleUnlockedTiles } from './shuffle'
 import { resolveSingleTarget, singleTargetIds, type TargetingContext, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 export type { TargetingContext, SingleTargetSkill, SingleTargetAction } from './single-target'
 import { beneficialProtocols, type BeneficialProtocol, type ProtocolId, protocolGroups, defaultEnergy, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
-import { energyAfterSlide, startLevelEnergy } from './energy'
+import { startLevelEnergy } from './energy'
 import { enterLevel, spawnFixedTile, spawnOrdinaryTile, type Opening } from './generation'
 import { goalReached } from './goal'
 import { moveBoard, type AdventureBoard, type Direction } from './move'
@@ -93,9 +94,11 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   if (!move.changed) return { accepted: false as const, state }
   const mergeScore = state.protocol === 'turbo-mode'
     ? move.score * beneficialProtocols['turbo-mode'].scoreMultiplier : move.score
-  const nodeScore = state.nodeScore + mergeScore
+  const rewards = mergeRewards(move,state.energy,state.owned,state.energyRules)
+  // D03/D05 review candidate: turbo and parallel each use the unmodified merge score.
+  const nodeScore = state.nodeScore + mergeScore + rewards.bonusScore
   const validMoves = state.validMoves + 1
-  let energy = energyAfterSlide(state.energy, move.events, state.energyRules)
+  let energy = rewards.energy
   const slid = { ...state, board:move.board }
   const fast = state.protocol === 'fast-spawn' ? protocolGroups.mixed['fast-spawn'] : null
   let next = fast ? spawnFixedTile(slid,fast.ordinaryValue) : spawnOrdinaryTile(slid,state.owned.includes('advanced-spawn'))

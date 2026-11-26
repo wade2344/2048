@@ -1,6 +1,7 @@
+import { mergeRewards } from './merge-rewards'
 import { resolveSingleTarget, singleTargetIds, type SingleTargetSkill, type SingleTargetAction } from './single-target'
-import { defaultEnergy, parallelCompute, skills, spawnTuning, zeroConfig, type SkillId } from '@infinite/game-config'
-import { energyAfterSlide, startLevelEnergy } from './energy'
+import { skills, spawnTuning, zeroConfig, type SkillId } from '@infinite/game-config'
+import { startLevelEnergy } from './energy'
 import { enterLevel, spawnOrdinaryTile } from './generation'
 import { moveBoard, type AdventureBoard, type Direction } from './move'
 import { legalSlides } from './classic'
@@ -34,11 +35,8 @@ export function slideZero(state: ZeroState, direction: Direction) {
   if (state.hp <= 0 || !['left','right','up','down'].includes(direction)) return { accepted: false as const, state }
   const move = moveBoard(state.board, direction, state.lock ? [state.lock.tileId] : [])
   if (!move.changed) return { accepted: false as const, state }
-  const pairs = move.events.filter(event => event.type === 'TILE_MERGED').length
-  const parallel = state.owned.includes('parallel-compute') && pairs >= parallelCompute.minimumPairs
-  const damage = move.score + (parallel ? move.score * parallelCompute.scoreFraction : 0)
-  const energy = Math.min(defaultEnergy.capacity, energyAfterSlide(state.energy, move.events) +
-    (parallel ? parallelCompute.extraEnergy : 0))
+  const { bonusScore, energy } = mergeRewards(move, state.energy, state.owned)
+  const damage = move.score + bonusScore
   const hp = Math.max(0, state.hp - damage)
   const after: ZeroState = { ...state, hp, board: move.board, energy,
     nodeScore: state.nodeScore + damage, validMoves: state.validMoves + 1 }
