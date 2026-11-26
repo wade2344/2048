@@ -27,3 +27,8 @@ nav { display:flex; gap:.5rem; margin-top:1.25rem }
 nav button[aria-pressed="true"] { border-color:#68d5ff; color:#91e1ff }
 h2 { font-size:1.05rem; margin:1rem 0 }
 .stats { flex-wrap:wrap; gap:.6rem 1.25rem }
+.replay-file { display:grid; gap:.5rem; margin:1.5rem 0 }
+.replay-file input { max-width:100% }
+.replay-range { width:100%; margin:1rem 0 }
+.replay-controls { display:flex; flex-wrap:wrap; gap:.4rem }
+.replay-controls button:disabled { opacity:.45 }

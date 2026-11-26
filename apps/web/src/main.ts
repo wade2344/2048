@@ -2,6 +2,7 @@ import { createApp, defineComponent, h, onBeforeUnmount, onMounted, shallowRef }
 import { adventureNodes } from '@infinite/game-config'
 import { firstNodeRecording, startFirstNode, legalSlides, slideClassic, slideOrdinaryNode, startClassic, type Direction, type OrdinaryNodeState } from '@infinite/game-engine'
 import './style.css'
+import { ReplayPlayer } from './replay-player'
 import { playFeedback } from './feedback'
 
 const keys: Record<string, Direction> = {
@@ -20,6 +21,7 @@ createApp(defineComponent({
     const node = adventureNodes[0]
     const adventure = shallowRef<OrdinaryNodeState>()
     const mode = shallowRef<'classic' | 'adventure'>('classic')
+    const viewingReplay = shallowRef(false)
     let adventureSeed = 0
     let successfulMoves: Direction[] = []
     function exportReplay() {
@@ -88,6 +90,7 @@ createApp(defineComponent({
       })
     }
     function keydown(event: KeyboardEvent) {
+      if (viewingReplay.value) return
       const direction = keys[event.key]
       if (!direction || event.ctrlKey || event.altKey || event.metaKey) return
       event.preventDefault()
@@ -109,6 +112,7 @@ createApp(defineComponent({
     onMounted(() => window.addEventListener('keydown', keydown))
     onBeforeUnmount(() => { clearFeedback(); window.removeEventListener('keydown', keydown) })
     return () => {
+      if (viewingReplay.value) return h(ReplayPlayer, { onClose:() => { viewingReplay.value = false } })
       const current = mode.value === 'adventure' ? adventure.value : undefined
       const ended = current ? !current.cleared && legalSlides(current.board).length === 0 : classic.value.ended
       const board = current?.board ?? classic.value.board
@@ -120,6 +124,7 @@ createApp(defineComponent({
         h('button', { 'aria-pressed':mode.value === 'classic', onClick:() => changeMode('classic') }, '经典模式'),
         h('button', { 'aria-pressed':!!current, onClick:() => changeMode('adventure') }, '冒险首关'),
       ]),
+      h('button', { onClick:() => { clearFeedback(); viewingReplay.value = true } }, '查看回放'),
       current && h('button', { onClick:exportReplay }, '导出首关回放'),
       current && h('h2', node.name + ' · 合成 ' + node.goal.target),
       h('section', {class:'stats', 'aria-label':'对局统计'}, [
