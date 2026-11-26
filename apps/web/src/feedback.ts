@@ -1,6 +1,6 @@
-import type { slideClassic } from '@infinite/game-engine'
+import type { slideOrdinaryNode } from '@infinite/game-engine'
 
-type MoveEvents = Extract<ReturnType<typeof slideClassic>, { accepted: true }>['events']
+type MoveEvents = Extract<ReturnType<typeof slideOrdinaryNode>, { accepted: true }>['events']
 
 /** Capture the previous grid before Vue paints the committed state. */
 export function playFeedback(grid: HTMLElement, events: MoveEvents) {
@@ -29,7 +29,7 @@ export function playFeedback(grid: HTMLElement, events: MoveEvents) {
         {duration:120,easing:'ease-out'}))
     } else if (event.type === 'TILE_MERGED') {
       merged.add(cells[event.to[0]*4+event.to[1]]!)
-    } else {
+    } else if (event.type === 'TILE_SPAWNED') {
       animations.push(cells[event.row*4+event.col]!.animate([{opacity:0,transform:'scale(.75)'},{opacity:1,transform:'scale(1)'}],
         {duration:120,delay:120,fill:'backwards'}))
     }

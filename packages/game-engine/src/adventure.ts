@@ -1,6 +1,7 @@
+import { shuffleUnlockedTiles } from './shuffle'
 import { resolveSingleTarget, singleTargetIds, type TargetingContext, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 export type { TargetingContext, SingleTargetSkill, SingleTargetAction } from './single-target'
-import { beneficialProtocols, type BeneficialProtocol, protocolGroups, defaultEnergy, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
+import { beneficialProtocols, type BeneficialProtocol, type ProtocolId, protocolGroups, defaultEnergy, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
 import { energyAfterSlide, startLevelEnergy } from './energy'
 import { enterLevel, spawnFixedTile, spawnOrdinaryTile, type Opening } from './generation'
 import { goalReached } from './goal'
@@ -10,10 +11,8 @@ import { protocolCapacity } from './protocol-pool'
 
 type OrdinaryGoal = Exclude<NodeGoal, { kind: 'boss' }>
 
-type SupportedProtocol = BeneficialProtocol | keyof typeof protocolGroups.restrictive | 'extreme-overload' | 'energy-compression' | 'fast-spawn'
-
 export interface OrdinaryNodeState {
-  readonly protocol: SupportedProtocol | null
+  readonly protocol: ProtocolId | null
   readonly owned: readonly SkillId[]
   readonly goal: OrdinaryGoal
   readonly board: AdventureBoard
@@ -56,7 +55,7 @@ export function enterBeneficialNode(random: RandomSnapshot, goal: OrdinaryGoal, 
 }
 
 export function enterProtocolNode(random: RandomSnapshot, goal: OrdinaryGoal, options: {
-  readonly protocol: SupportedProtocol
+  readonly protocol: ProtocolId
   readonly firstId: number
   readonly owned: readonly SkillId[]
 }): OrdinaryNodeState {
@@ -67,6 +66,7 @@ export function enterProtocolNode(random: RandomSnapshot, goal: OrdinaryGoal, op
   switch (protocol) {
     case 'energy-surge': rules.initial = beneficialProtocols[protocol].initialEnergy; break
     case 'advanced-cache': protocolTiles.push(beneficialProtocols[protocol].openingTile); break
+    case 'unstable-matrix': protocolTiles.push(...protocolGroups.mixed[protocol].openingTiles); break
     case 'extreme-overload': rules.perMerge = protocolGroups.mixed[protocol].perMerge; break
     case 'fast-spawn':
       if (owned.includes('advanced-spawn')) throw new RangeError('D06: unresolved fast-spawn and advanced-spawn combination')
@@ -99,7 +99,9 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   const slid = { ...state, board:move.board }
   const fast = state.protocol === 'fast-spawn' ? protocolGroups.mixed['fast-spawn'] : null
   let next = fast ? spawnFixedTile(slid,fast.ordinaryValue) : spawnOrdinaryTile(slid,state.owned.includes('advanced-spawn'))
-  const events = [...move.events, { type:'TILE_SPAWNED' as const, ...next.spawned }]
+  type TurnEvent = typeof move.events[number] | ({type:'TILE_SPAWNED'} & typeof next.spawned)
+    | {type:'PROTOCOL_SHUFFLED'; valuesChanged:boolean}
+  const events:TurnEvent[] = [...move.events, { type:'TILE_SPAWNED', ...next.spawned }]
   const cleared = completed(state.goal, next.board, nodeScore, validMoves)
   if (!cleared && state.protocol === 'periodic-error') {
     const rule = protocolGroups.restrictive[state.protocol]
@@ -111,6 +113,12 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   }
   const updated: OrdinaryNodeState = { ...state, board: next.board, nextId: next.nextId,
     random: next.random, nodeScore, validMoves, energy, cleared }
+  if (!cleared && state.protocol === 'unstable-matrix' && validMoves % protocolGroups.mixed['unstable-matrix'].interval === 0) {
+    // D07 candidate: an environmental shuffle commits one draw sequence even if values match.
+    const shuffle = shuffleUnlockedTiles(updated.board,updated.random)
+    events.push({type:'PROTOCOL_SHUFFLED',valuesChanged:shuffle.valuesChanged})
+    return { accepted:true as const, state:{ ...updated, board:shuffle.board, random:shuffle.random }, events }
+  }
   return { accepted: true as const, state: updated, events }
 }
 
