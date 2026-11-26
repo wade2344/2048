@@ -1,0 +1,25 @@
+{
+  "name": "2048-infinite",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @infinite/web dev",
+    "lint": "eslint . && node scripts/check-workspace.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "pnpm -r --sort run build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "simulate": "pnpm --filter @infinite/simulator start"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "eslint": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

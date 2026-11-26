@@ -1,0 +1,13 @@
+{
+  "name": "@infinite/game-engine",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@infinite/game-config": "workspace:*"
+  },
+  "devDependencies": {}
+}
