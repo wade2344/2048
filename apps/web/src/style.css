@@ -23,3 +23,7 @@ p { color:#b8c7de; font-size:.9rem }
 
 .board { position:relative }
 .ghost { position:absolute; pointer-events:none; z-index:1 }
+nav { display:flex; gap:.5rem; margin-top:1.25rem }
+nav button[aria-pressed="true"] { border-color:#68d5ff; color:#91e1ff }
+h2 { font-size:1.05rem; margin:1rem 0 }
+.stats { flex-wrap:wrap; gap:.6rem 1.25rem }

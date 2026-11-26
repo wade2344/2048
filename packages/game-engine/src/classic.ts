@@ -1,9 +1,9 @@
 import { enterLevel, ordinaryMove } from './generation'
-import { moveBoard, type Board, type Direction } from './move'
+import { moveBoard, type AdventureBoard, type Board, type Direction } from './move'
 import { createRandomSnapshot, type RandomSnapshot } from './random'
 
 const directions: readonly Direction[] = ['up', 'down', 'left', 'right']
-export function legalSlides(board: Board) {
+export function legalSlides(board: AdventureBoard) {
   return directions.filter(direction => moveBoard(board, direction).changed)
 }
 
