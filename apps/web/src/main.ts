@@ -2,6 +2,7 @@ import { createApp, defineComponent, h, onBeforeUnmount, onMounted, shallowRef }
 import { adventureNodes } from '@infinite/game-config'
 import { firstNodeRecording, startFirstNode, legalSlides, slideClassic, slideOrdinaryNode, startClassic, type Direction, type OrdinaryNodeState } from '@infinite/game-engine'
 import './style.css'
+import { firstNodeSlot, encodeFirstNodeSave, decodeFirstNodeSave } from './adventure-save'
 import { ReplayPlayer } from './replay-player'
 import { playFeedback } from './feedback'
 
@@ -24,6 +25,40 @@ createApp(defineComponent({
     const viewingReplay = shallowRef(false)
     let adventureSeed = 0
     let successfulMoves: Direction[] = []
+    const saveMessage = shallowRef('')
+    let previousSave: string | null = null
+    let preserveSlot = false
+    function persist(state: OrdinaryNodeState) {
+      if (preserveSlot) return
+      try {
+        if (localStorage.getItem(firstNodeSlot) !== previousSave) {
+          preserveSlot = true
+          saveMessage.value = '存档已在其他页面更改。刷新可载入该进度，本页仍可导出回放。'
+          return
+        }
+        const raw = encodeFirstNodeSave(state, adventureSeed, successfulMoves)
+        localStorage.setItem(firstNodeSlot,raw)
+        previousSave = raw
+        saveMessage.value = ''
+      } catch {
+        saveMessage.value = '自动保存失败。可以继续本局并导出回放。'
+      }
+    }
+    function resumeOrStart() {
+      try {
+        previousSave = localStorage.getItem(firstNodeSlot)
+        if (previousSave !== null) {
+          const saved = decodeFirstNodeSave(previousSave)
+          adventureSeed = saved.seed
+          successfulMoves = saved.moves
+          return saved.state
+        }
+      } catch {
+        preserveSlot = true
+        saveMessage.value = '无法读取首关存档，已保留原存档。本次试玩可导出回放。'
+      }
+      return newAdventure()
+    }
     function exportReplay() {
       const data = JSON.stringify(firstNodeRecording(adventureSeed, successfulMoves))
       const url = URL.createObjectURL(new Blob([data], {type:'application/json'}))
@@ -36,17 +71,25 @@ createApp(defineComponent({
     function newAdventure() {
       adventureSeed = newSeed()
       successfulMoves = []
-      return startFirstNode(adventureSeed)
+      const state = startFirstNode(adventureSeed)
+      persist(state)
+      return state
     }
     function changeMode(next: typeof mode.value) {
       clearFeedback()
-      if (next === 'adventure') adventure.value ??= newAdventure()
+      if (next === 'adventure') adventure.value ??= resumeOrStart()
       mode.value = next
     }
     function restart() {
       clearFeedback()
       if (mode.value === 'classic') classic.value = startClassic(newSeed())
-      else adventure.value = newAdventure()
+      else {
+        if (preserveSlot) {
+          if (!window.confirm('重新开始并替换当前首关存档？')) return
+          try { previousSave = localStorage.getItem(firstNodeSlot); preserveSlot = false } catch { /* Keep temporary play available. */ }
+        }
+        adventure.value = newAdventure()
+      }
     }
     let gesture: { id: number; x: number; y: number } | undefined
 
@@ -71,6 +114,7 @@ createApp(defineComponent({
         if (!move.accepted) return
         successfulMoves.push(direction)
         adventure.value = move.state
+        persist(move.state)
         events = move.events
       } else {
         const move = slideClassic(classic.value, direction)
@@ -126,6 +170,7 @@ createApp(defineComponent({
       ]),
       h('button', { onClick:() => { clearFeedback(); viewingReplay.value = true } }, '查看回放'),
       current && h('button', { onClick:exportReplay }, '导出首关回放'),
+      current && saveMessage.value && h('p',{role:'alert'},saveMessage.value),
       current && h('h2', node.name + ' · 合成 ' + node.goal.target),
       h('section', {class:'stats', 'aria-label':'对局统计'}, [
         h('div',[h('span','运算分数'), h('strong', {id:'score'}, current?.nodeScore ?? classic.value.score)]),
