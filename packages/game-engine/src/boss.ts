@@ -1,3 +1,4 @@
+import { resolveSingleTarget, singleTargetIds, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 import { defaultEnergy, parallelCompute, skills, spawnTuning, zeroConfig, type SkillId } from '@infinite/game-config'
 import { energyAfterSlide, startLevelEnergy } from './energy'
 import { enterLevel, spawnOrdinaryTile } from './generation'
@@ -66,4 +67,18 @@ export function resolveGridLock(state: ZeroState): ZeroState {
   if (!cell || 'kind' in cell || state.lock) return resolved
   if (legalSlides(state.board).length && !legalSlides(state.board, [cell.id]).length) return resolved
   return { ...resolved, lock:{ tileId:cell.id, remainingMoves:zeroConfig.lockDuration } }
+}
+
+function zeroTargeting(state: ZeroState) {
+  return { lockedTileIds:state.lock ? [state.lock.tileId] : [] }
+}
+
+export function legalZeroTargets(state: ZeroState, skill: SingleTargetSkill) {
+  return singleTargetIds({ ...state, cleared:state.hp <= 0 }, zeroTargeting(state), skill)
+}
+
+export function useZeroTargetSkill(state: ZeroState, action: SingleTargetAction) {
+  const result = resolveSingleTarget({ ...state, cleared:state.hp <= 0 }, zeroTargeting(state), action)
+  if (!result.accepted) return { accepted:false as const, state }
+  return { accepted:true as const, state:{ ...state, board:result.board, energy:result.energy }, events:result.events }
 }
