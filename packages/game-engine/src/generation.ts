@@ -62,6 +62,10 @@ export function enterLevel(random: RandomSnapshot, opening: Opening,
   return {board: state.board, random: state.random, nextId: state.nextId, spawned, cleared: meetsGoal(state.board)}
 }
 
+export function spawnFixedTile<T extends Tile | Obstacle>(state: GridState<T>, value: number) {
+  return place(state, value)
+}
+
 export function spawnOrdinaryTile<T extends Tile | Obstacle>(state: GridState<T>, advancedSpawn = false) {
   return place(state, undefined, advancedSpawn)
 }

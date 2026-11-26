@@ -2,7 +2,7 @@ import { resolveSingleTarget, singleTargetIds, type TargetingContext, type Singl
 export type { TargetingContext, SingleTargetSkill, SingleTargetAction } from './single-target'
 import { beneficialProtocols, type BeneficialProtocol, protocolGroups, defaultEnergy, spawnTuning, type SkillId, type EnergyRules, type NodeGoal } from '@infinite/game-config'
 import { energyAfterSlide, startLevelEnergy } from './energy'
-import { enterLevel, spawnOrdinaryTile, type Opening } from './generation'
+import { enterLevel, spawnFixedTile, spawnOrdinaryTile, type Opening } from './generation'
 import { goalReached } from './goal'
 import { moveBoard, type AdventureBoard, type Direction } from './move'
 import { drawIndex, type RandomSnapshot } from './random'
@@ -10,7 +10,7 @@ import { protocolCapacity } from './protocol-pool'
 
 type OrdinaryGoal = Exclude<NodeGoal, { kind: 'boss' }>
 
-type SupportedProtocol = BeneficialProtocol | keyof typeof protocolGroups.restrictive | 'extreme-overload' | 'energy-compression'
+type SupportedProtocol = BeneficialProtocol | keyof typeof protocolGroups.restrictive | 'extreme-overload' | 'energy-compression' | 'fast-spawn'
 
 export interface OrdinaryNodeState {
   readonly protocol: SupportedProtocol | null
@@ -68,6 +68,9 @@ export function enterProtocolNode(random: RandomSnapshot, goal: OrdinaryGoal, op
     case 'energy-surge': rules.initial = beneficialProtocols[protocol].initialEnergy; break
     case 'advanced-cache': protocolTiles.push(beneficialProtocols[protocol].openingTile); break
     case 'extreme-overload': rules.perMerge = protocolGroups.mixed[protocol].perMerge; break
+    case 'fast-spawn':
+      if (owned.includes('advanced-spawn')) throw new RangeError('D06: unresolved fast-spawn and advanced-spawn combination')
+      break
     case 'data-corruption': {
       const position = drawIndex(random, 'board', 16)
       obstacles.push([Math.floor(position.value / 4), position.value % 4])
@@ -93,16 +96,22 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   const nodeScore = state.nodeScore + mergeScore
   const validMoves = state.validMoves + 1
   let energy = energyAfterSlide(state.energy, move.events, state.energyRules)
-  const next = spawnOrdinaryTile({ ...state, board: move.board }, state.owned.includes('advanced-spawn'))
+  const slid = { ...state, board:move.board }
+  const fast = state.protocol === 'fast-spawn' ? protocolGroups.mixed['fast-spawn'] : null
+  let next = fast ? spawnFixedTile(slid,fast.ordinaryValue) : spawnOrdinaryTile(slid,state.owned.includes('advanced-spawn'))
+  const events = [...move.events, { type:'TILE_SPAWNED' as const, ...next.spawned }]
   const cleared = completed(state.goal, next.board, nodeScore, validMoves)
   if (!cleared && state.protocol === 'periodic-error') {
     const rule = protocolGroups.restrictive[state.protocol]
     if (validMoves % rule.interval === 0) energy = Math.max(0, energy - rule.energyLoss)
   }
+  if (fast && !cleared && validMoves % fast.interval === 0 && next.board.some(row => row.includes(null))) {
+    next = spawnFixedTile(next,fast.extraValue)
+    events.push({ type:'TILE_SPAWNED', ...next.spawned })
+  }
   const updated: OrdinaryNodeState = { ...state, board: next.board, nextId: next.nextId,
     random: next.random, nodeScore, validMoves, energy, cleared }
-  return { accepted: true as const, state: updated,
-    events: [...move.events, { type: 'TILE_SPAWNED' as const, ...next.spawned }] }
+  return { accepted: true as const, state: updated, events }
 }
 
 export function legalSingleTargets(state: OrdinaryNodeState, context: TargetingContext, skill: SingleTargetSkill) {
