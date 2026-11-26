@@ -6,3 +6,4 @@ export function createEmptyBoard({ size }: BoardConfig): null[][] {
 }
 export * from './move'
 export * from './random'
+export * from './generation'
