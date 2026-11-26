@@ -23,3 +23,5 @@ export const spawnTuning = {
   advancedFourWeight: 3,
   preloadValue: 8,
 } as const
+
+export const parallelCompute = { minimumPairs: 3, scoreFraction: 0.5, extraEnergy: 1 } as const
