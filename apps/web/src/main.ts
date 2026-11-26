@@ -1,6 +1,7 @@
 import { createApp, defineComponent, h, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { slideClassic, startClassic, type Direction } from '@infinite/game-engine'
 import './style.css'
+import { playFeedback } from './feedback'
 
 const keys: Record<string, Direction> = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
@@ -17,9 +18,34 @@ createApp(defineComponent({
     const state = shallowRef(newGame())
     let gesture: { id: number; x: number; y: number } | undefined
 
+    const grid = shallowRef<HTMLElement>()
+    let playback: ReturnType<typeof playFeedback> | undefined
+    let queued: Direction | undefined
+    function clearFeedback() {
+      queued = undefined
+      playback?.cancel()
+      playback = undefined
+      gesture = undefined
+    }
     function slide(direction: Direction) {
+      if (state.value.ended) return
+      if (playback) {
+        queued ??= direction
+        return
+      }
       const move = slideClassic(state.value, direction)
-      if (move.accepted) state.value = move.state
+      if (!move.accepted) return
+      state.value = move.state
+      if (!grid.value || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+      const active = playFeedback(grid.value, move.events)
+      playback = active
+      void active.finished.then(() => {
+        if (playback !== active) return
+        playback = undefined
+        const direction = queued
+        queued = undefined
+        if (direction) slide(direction)
+      })
     }
     function keydown(event: KeyboardEvent) {
       const direction = keys[event.key]
@@ -41,16 +67,16 @@ createApp(defineComponent({
       slide(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'))
     }
     onMounted(() => window.addEventListener('keydown', keydown))
-    onBeforeUnmount(() => window.removeEventListener('keydown', keydown))
+    onBeforeUnmount(() => { clearFeedback(); window.removeEventListener('keydown', keydown) })
     return () => h('section', { class: 'console' }, [
       h('header', [h('h1', ['2048', h('small','INFINITE')]), h('button', {
-        onClick: () => { gesture = undefined; state.value = newGame() },
+        onClick: () => { clearFeedback(); state.value = newGame() },
       }, '重新开始')]),
       h('section', {class:'stats', 'aria-label':'对局统计'}, [
         h('div',[h('span','运算分数'), h('strong', {id:'score'}, state.value.score)]),
         h('div',[h('span','有效移动'), h('strong', {id:'moves'}, state.value.actions.length)]),
       ]),
-      h('div', {class:'board', role:'group', 'aria-label':'经典运算矩阵',
+      h('div', {ref:grid, class:'board', role:'group', 'aria-label':'经典运算矩阵',
         onPointerdown:press, onPointerup:release,
         onPointercancel:(e: PointerEvent) => { if (gesture?.id === e.pointerId) gesture = undefined },
       }, state.value.board.flatMap((row,r) => row.map((tile,c) =>
