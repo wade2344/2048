@@ -1,7 +1,6 @@
-import { moveBoard, type Board, type Direction, type Tile } from './move'
+import { moveBoard, type Board, type Direction, type Obstacle, type Tile } from './move'
 import { drawIndex, type RandomSnapshot } from './random'
 
-export type Obstacle = { readonly kind: 'obstacle' }
 type Matrix<T> = readonly (readonly (T | null)[])[]
 interface GridState<T> {
   readonly board: Matrix<T>
