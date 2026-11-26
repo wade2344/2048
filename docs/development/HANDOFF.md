@@ -23,3 +23,11 @@
 ## 2026-11-26 · Phase 1 提交核对
 
 已核对工程基线提交 77cc730。核对时本地 phase1/workspace-ci 与远端跟踪分支指向同一提交，工作区干净。GitHub 按该分支查询未返回 PR。下一步为该分支向 main 开 Draft PR，记录 Engineering checks 的运行链接和结果，再核实 main 是否要求该检查通过才能合并。M0-04 远端验收仍待完成。
+
+## 2026-11-26 · M1-01 可复现随机流
+
+用户已审阅常规移动。[PR #3](https://github.com/wade2344/2048/pull/3) 的 [Engineering checks](https://github.com/wade2344/2048/actions/runs/45802211010) 成功。同步时 main 为 e5d4d40，移动分支尚待人工合并。本步骤独立从 main 构建。
+
+已实现 D16 候选 mulberry32-streams-v1，使用无符号 32 位种子、固定偏移派生 board/reward/protocol/boss 四路状态、有版本标识的快照恢复及无偏索引抽样。改变算法或派生方式会改变回放序列，需明确版本身份。此方案供审阅，D11/D16 保持开放。
+
+pnpm check 通过，包括 5 个新增用例与 1 个原有测试。已核对固定序列、四流隔离、JSON 快照恢复、拒绝抽样及非法参数。下一步审阅该独立分支；两项集成时注意两个分支均在引擎 index.ts 追加导出，保留 move 和 random。进入 M1-03 前确认 D01 初始棋盘、D02 判胜及 D18 初始化事务；每步继续更新本记录。

@@ -4,3 +4,4 @@ import type { BoardConfig } from '@infinite/game-config'
 export function createEmptyBoard({ size }: BoardConfig): null[][] {
   return Array.from({ length: size }, () => Array<null>(size).fill(null))
 }
+export * from './random'
