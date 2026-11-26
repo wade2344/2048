@@ -2,9 +2,12 @@ import { defaultEnergy, parallelCompute, skills, spawnTuning, zeroConfig, type S
 import { energyAfterSlide, startLevelEnergy } from './energy'
 import { enterLevel, spawnOrdinaryTile } from './generation'
 import { moveBoard, type AdventureBoard, type Direction } from './move'
-import type { RandomSnapshot } from './random'
+import { legalSlides } from './classic'
+import { drawIndex, type RandomSnapshot } from './random'
 
 export interface ZeroState {
+  readonly warning: readonly [row: number, col: number] | null
+  readonly lock: { readonly tileId: string; readonly remainingMoves: number } | null
   readonly hp: number
   readonly owned: readonly SkillId[]
   readonly board: AdventureBoard
@@ -21,14 +24,14 @@ export function startZero(random: RandomSnapshot, firstId: number, owned: readon
   const skillTiles = owned.includes('preload-energy') ? [spawnTuning.preloadValue] : []
   const opening = enterLevel(random, { obstacles: [], skillTiles, protocolTiles: [] },
     () => false, firstId, owned.includes('advanced-spawn'))
-  return { hp: zeroConfig.maxHp, owned: [...owned], board: opening.board, random: opening.random,
+  return { warning: null, lock: null, hp: zeroConfig.maxHp, owned: [...owned], board: opening.board, random: opening.random,
     nextId: opening.nextId, energy: startLevelEnergy(), nodeScore: 0, validMoves: 0 }
 }
 
 /** Resolve through damage and ordinary generation. GRID LOCK follows a surviving turn. */
 export function slideZero(state: ZeroState, direction: Direction) {
   if (state.hp <= 0 || !['left','right','up','down'].includes(direction)) return { accepted: false as const, state }
-  const move = moveBoard(state.board, direction)
+  const move = moveBoard(state.board, direction, state.lock ? [state.lock.tileId] : [])
   if (!move.changed) return { accepted: false as const, state }
   const pairs = move.events.filter(event => event.type === 'TILE_MERGED').length
   const parallel = state.owned.includes('parallel-compute') && pairs >= parallelCompute.minimumPairs
@@ -42,6 +45,25 @@ export function slideZero(state: ZeroState, direction: Direction) {
   const events = [...move.events, ...damageEvents]
   if (!hp) return { accepted:true as const, state:after, events }
   const next = spawnOrdinaryTile(after, state.owned.includes('advanced-spawn'))
-  return { accepted:true as const, state:{ ...after, board:next.board, nextId:next.nextId, random:next.random },
+  const lock = state.lock && state.lock.remainingMoves > 1
+    ? { ...state.lock, remainingMoves:state.lock.remainingMoves - 1 } : null
+  return { accepted:true as const, state:{ ...after, lock, board:next.board, nextId:next.nextId, random:next.random },
     events:[...events, { type:'TILE_SPAWNED' as const, ...next.spawned }] }
+}
+
+/** The encounter clock invokes these stages when its timing policy requests them. */
+export function warnGridLock(state: ZeroState): ZeroState {
+  if (state.hp <= 0 || state.warning) return state
+  const draw = drawIndex(state.random, 'boss', 16)
+  return { ...state, warning:[Math.floor(draw.value / 4), draw.value % 4], random:draw.snapshot }
+}
+
+export function resolveGridLock(state: ZeroState): ZeroState {
+  if (state.hp <= 0 || !state.warning) return state
+  const [row, col] = state.warning
+  const cell = state.board[row]?.[col]
+  const resolved = { ...state, warning:null }
+  if (!cell || 'kind' in cell || state.lock) return resolved
+  if (legalSlides(state.board).length && !legalSlides(state.board, [cell.id]).length) return resolved
+  return { ...resolved, lock:{ tileId:cell.id, remainingMoves:zeroConfig.lockDuration } }
 }

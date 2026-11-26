@@ -3,8 +3,8 @@ import { moveBoard, type AdventureBoard, type Board, type Direction } from './mo
 import { createRandomSnapshot, type RandomSnapshot } from './random'
 
 const directions: readonly Direction[] = ['up', 'down', 'left', 'right']
-export function legalSlides(board: AdventureBoard) {
-  return directions.filter(direction => moveBoard(board, direction).changed)
+export function legalSlides(board: AdventureBoard, lockedTileIds: readonly string[] = []) {
+  return directions.filter(direction => moveBoard(board, direction, lockedTileIds).changed)
 }
 
 export interface ClassicState {

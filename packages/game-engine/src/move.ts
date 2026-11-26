@@ -19,9 +19,9 @@ function position(line: number, offset: number, direction: Direction): Position 
 
 type MoveResult<B> = { board: B; changed: boolean; score: number; events: Event[] }
 
-export function moveBoard(board: Board, direction: Direction): MoveResult<Board>
-export function moveBoard(board: AdventureBoard, direction: Direction): MoveResult<AdventureBoard>
-export function moveBoard(board: AdventureBoard, direction: Direction): MoveResult<AdventureBoard> {
+export function moveBoard(board: Board, direction: Direction, lockedTileIds?: readonly string[]): MoveResult<Board>
+export function moveBoard(board: AdventureBoard, direction: Direction, lockedTileIds?: readonly string[]): MoveResult<AdventureBoard>
+export function moveBoard(board: AdventureBoard, direction: Direction, lockedTileIds: readonly string[] = []): MoveResult<AdventureBoard> {
   if (board.length !== 4 || board.some(row => row.length !== 4)) {
     throw new RangeError('Expected a 4x4 board')
   }
@@ -56,7 +56,7 @@ export function moveBoard(board: AdventureBoard, direction: Direction): MoveResu
       const from = position(line, offset, direction)
       const cell = board[from[0]]![from[1]]
       if (!cell) continue
-      if ('kind' in cell) {
+      if ('kind' in cell || lockedTileIds.includes(cell.id)) {
         slideSegment(line, start, occupied)
         occupied.length = 0
         start = offset + 1
