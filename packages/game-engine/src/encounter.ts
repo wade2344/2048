@@ -1,3 +1,4 @@
+import { shuffleUnlockedTiles } from './shuffle'
 import { swapTargets } from './single-target'
 import { skills } from '@infinite/game-config'
 import { slideOrdinaryNode, useSingleTargetSkill, type OrdinaryNodeState, type SingleTargetAction } from './adventure'
@@ -12,7 +13,8 @@ interface SwapAction {
   readonly targets:readonly string[]
 }
 type EncounterAction = SwapAction | { readonly type:'MOVE'; readonly direction:Direction } | SingleTargetAction |
-  { readonly type:'USE_SKILL'; readonly skillId:'state-rollback'; readonly targets:readonly string[] }
+  { readonly type:'USE_SKILL'; readonly skillId:'state-rollback'; readonly targets:readonly string[] } |
+  { readonly type:'USE_SKILL'; readonly skillId:'matrix-rebuild'; readonly targets:readonly string[] }
 
 export interface Encounter {
   readonly node:Node
@@ -24,6 +26,7 @@ export function startEncounter(node:Node): Encounter {
   return { node, beforeMove:null, actions:[] }
 }
 
+const rebuildCost = skills.find(skill => skill.id === 'matrix-rebuild')!.baseCost
 const rollbackCost = skills.find(skill => skill.id === 'state-rollback')!.baseCost
 
 function swappableTiles(node:Node) {
@@ -68,6 +71,16 @@ export function dispatchEncounter(encounter:Encounter, action:EncounterAction) {
   if (action.type === 'USE_SKILL' && !Array.isArray(action.targets)) return rejected
   if ('hp' in node ? node.hp <= 0 : node.cleared) return rejected
   if (action.type === 'USE_SKILL' && action.skillId === 'data-swap') return swap(encounter,action)
+  if (action.type === 'USE_SKILL' && action.skillId === 'matrix-rebuild') {
+    if (action.targets.length || !node.owned.includes('matrix-rebuild')) return rejected
+    const cost = 'protocol' in node && node.protocol ? protocolSkillCost(node.protocol,rebuildCost) : rebuildCost
+    if (node.energy < cost) return rejected
+    const shuffled = shuffleUnlockedTiles(node.board,node.random,'lock' in node ? node.lock?.tileId : undefined)
+    if (!shuffled.valuesChanged) return { ...rejected, pendingDecision:'D07/D13' as const }
+    const after = { ...node, board:shuffled.board, random:shuffled.random, energy:node.energy-cost }
+    return { accepted:true as const, encounter:{ node:after, beforeMove:null, actions:[...encounter.actions,action] },
+      events:[{ type:'MATRIX_REBUILT' as const }] }
+  }
   if (action.type === 'USE_SKILL' && action.skillId === 'state-rollback') {
     if (action.targets.length || !node.owned.includes('state-rollback') || !beforeMove) return rejected
     const cost = 'protocol' in node && node.protocol ? protocolSkillCost(node.protocol,rollbackCost) : rollbackCost
