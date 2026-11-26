@@ -1,3 +1,4 @@
+import { swapTargets } from './single-target'
 import { skills } from '@infinite/game-config'
 import { slideOrdinaryNode, useSingleTargetSkill, type OrdinaryNodeState, type SingleTargetAction } from './adventure'
 import { slideZero, useZeroTargetSkill, type ZeroState } from './boss'
@@ -5,7 +6,12 @@ import type { Direction } from './move'
 import { protocolSkillCost } from './protocol-pool'
 
 type Node = OrdinaryNodeState | ZeroState
-type EncounterAction = { readonly type:'MOVE'; readonly direction:Direction } | SingleTargetAction |
+interface SwapAction {
+  readonly type:'USE_SKILL'
+  readonly skillId:'data-swap'
+  readonly targets:readonly string[]
+}
+type EncounterAction = SwapAction | { readonly type:'MOVE'; readonly direction:Direction } | SingleTargetAction |
   { readonly type:'USE_SKILL'; readonly skillId:'state-rollback'; readonly targets:readonly string[] }
 
 export interface Encounter {
@@ -20,12 +26,48 @@ export function startEncounter(node:Node): Encounter {
 
 const rollbackCost = skills.find(skill => skill.id === 'state-rollback')!.baseCost
 
+function swappableTiles(node:Node) {
+  const boss = 'hp' in node
+  return swapTargets({ ...node, cleared:boss ? node.hp <= 0 : node.cleared },
+    { lockedTileIds:boss && node.lock ? [node.lock.tileId] : [] })
+}
+
+/** D13 equal-value pairs await a decision. Offer the established different-value pairs. */
+export function legalSwapPairs(node:Node) {
+  const tiles = swappableTiles(node)
+  return tiles.flatMap((first,i) => tiles.slice(i+1).filter(other => first.tile.value !== other.tile.value)
+    .map(other => [first.tile.id,other.tile.id] as const))
+}
+
+function swap(encounter:Encounter, action:SwapAction) {
+  const rejected = { accepted:false as const, encounter }
+  const [a,b] = action.targets
+  if (action.targets.length !== 2 || a === b) return rejected
+  const targets = swappableTiles(encounter.node)
+  const first = targets.find(target => target.tile.id === a)
+  const second = targets.find(target => target.tile.id === b)
+  if (!first || !second) return rejected
+  if (first.tile.value === second.tile.value) return { ...rejected, pendingDecision:'D13' as const }
+  const board = encounter.node.board.map((line,r) => {
+    if (r !== first.row && r !== second.row) return line
+    return line.map((tile,c) => {
+      if (r === first.row && c === first.col) return second.tile
+      if (r === second.row && c === second.col) return first.tile
+      return tile
+    })
+  })
+  return { accepted:true as const, encounter:{ node:{ ...encounter.node, board, energy:encounter.node.energy-first.cost },
+    beforeMove:null, actions:[...encounter.actions,action] }, events:[{ type:'TILES_SWAPPED' as const,
+    first:{ id:first.tile.id, row:first.row, col:first.col }, second:{ id:second.tile.id, row:second.row, col:second.col } }] }
+}
+
 export function dispatchEncounter(encounter:Encounter, action:EncounterAction) {
   const { node, beforeMove } = encounter
   const rejected = { accepted:false as const, encounter }
   if (!action || (action.type !== 'MOVE' && action.type !== 'USE_SKILL')) return rejected
   if (action.type === 'USE_SKILL' && !Array.isArray(action.targets)) return rejected
   if ('hp' in node ? node.hp <= 0 : node.cleared) return rejected
+  if (action.type === 'USE_SKILL' && action.skillId === 'data-swap') return swap(encounter,action)
   if (action.type === 'USE_SKILL' && action.skillId === 'state-rollback') {
     if (action.targets.length || !node.owned.includes('state-rollback') || !beforeMove) return rejected
     const cost = 'protocol' in node && node.protocol ? protocolSkillCost(node.protocol,rollbackCost) : rollbackCost

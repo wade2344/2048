@@ -23,10 +23,10 @@ export interface TargetingContext {
   readonly lockedTileIds: readonly string[]
 }
 
-function eligibleTargets(state: SkillState, context: TargetingContext, skill: SingleTargetSkill) {
+function eligibleTargets(state: SkillState, context: TargetingContext, skill: SingleTargetSkill | 'data-swap') {
   const definition = skills.find(entry => entry.id === skill)
   if (state.cleared || !state.owned.includes(skill) || !definition ||
-    (skill !== 'targeted-overclock' && skill !== 'data-clear')) return []
+    (skill !== 'targeted-overclock' && skill !== 'data-clear' && skill !== 'data-swap')) return []
   const cost = state.protocol ? protocolSkillCost(state.protocol, definition.baseCost) : definition.baseCost
   if (state.energy < cost) return []
   return state.board.flatMap((line, row) => line.flatMap((tile, col) =>
@@ -41,7 +41,7 @@ export function singleTargetIds(state: SkillState, context: TargetingContext, sk
 export function resolveSingleTarget(state: SkillState, context: TargetingContext,
   action: SingleTargetAction) {
   const rejected = { accepted: false as const }
-  if (action.targets.length !== 1) return rejected
+  if ((action.skillId !== 'targeted-overclock' && action.skillId !== 'data-clear') || action.targets.length !== 1) return rejected
   const target = eligibleTargets(state, context, action.skillId).find(entry => entry.tile.id === action.targets[0])
   if (!target) return rejected
   const { row, col, tile, cost } = target
@@ -55,4 +55,8 @@ export function resolveSingleTarget(state: SkillState, context: TargetingContext
   return { accepted: true as const, board, energy: result.energy,
     events: [{ type: 'SKILL_APPLIED' as const, skillId: action.skillId, tileId: tile.id, row, col,
       previousValue: tile.value, value: after?.value ?? null }] }
+}
+
+export function swapTargets(state: SkillState, context: TargetingContext) {
+  return eligibleTargets(state,context,'data-swap')
 }
