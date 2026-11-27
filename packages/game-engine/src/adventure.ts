@@ -1,3 +1,4 @@
+import { collectFullBoard } from './garbage-collect'
 import { mergeRewards, type MergeCounters } from './merge-rewards'
 import { shuffleUnlockedTiles } from './shuffle'
 import { resolveSingleTarget, singleTargetIds, type TargetingContext, type SingleTargetSkill, type SingleTargetAction } from './single-target'
@@ -22,6 +23,7 @@ export interface OrdinaryNodeState {
   readonly energyRules: EnergyRules
   readonly energy: number
   readonly mergeCounters?: MergeCounters
+  readonly garbageCollected?: boolean
   readonly nodeScore: number
   readonly validMoves: number
   readonly cleared: boolean
@@ -43,8 +45,9 @@ export function startOrdinaryNode(random: RandomSnapshot, goal: OrdinaryGoal, op
     ? { ...opening, skillTiles: [...opening.skillTiles, spawnTuning.preloadValue] } : opening
   const { board, nextId, random: afterOpening, cleared } = enterLevel(random, bonuses,
     board => completed(goal, board, 0, 0), firstId, owned.includes('advanced-spawn'))
-  return { protocol: null, owned: [...owned], goal, board, nextId, random: afterOpening, cleared, energyRules,
+  const state: OrdinaryNodeState = { protocol: null, owned: [...owned], goal, board, nextId, random: afterOpening, cleared, energyRules,
     energy: startLevelEnergy(energyRules), nodeScore: 0, validMoves: 0 }
+  return cleared ? state : collectFullBoard(state).state
 }
 
 /** Enter with the already selected protocol; selection and its RNG belong to preparation. */
@@ -104,7 +107,7 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   const fast = state.protocol === 'fast-spawn' ? protocolGroups.mixed['fast-spawn'] : null
   let next = fast ? spawnFixedTile(slid,fast.ordinaryValue) : spawnOrdinaryTile(slid,state.owned.includes('advanced-spawn'))
   type TurnEvent = typeof move.events[number] | ({type:'TILE_SPAWNED'} & typeof next.spawned)
-    | {type:'PROTOCOL_SHUFFLED'; valuesChanged:boolean}
+    | {type:'PROTOCOL_SHUFFLED'; valuesChanged:boolean} | NonNullable<ReturnType<typeof collectFullBoard>['event']>
   const events:TurnEvent[] = [...move.events, { type:'TILE_SPAWNED', ...next.spawned }]
   const cleared = completed(state.goal, next.board, nodeScore, validMoves)
   if (!cleared && state.protocol === 'periodic-error') {
@@ -115,13 +118,18 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
     next = spawnFixedTile(next,fast.extraValue)
     events.push({ type:'TILE_SPAWNED', ...next.spawned })
   }
-  const updated: OrdinaryNodeState = { ...state, ...(rewards.counters && {mergeCounters:rewards.counters}), board: next.board, nextId: next.nextId,
+  let updated: OrdinaryNodeState = { ...state, ...(rewards.counters && {mergeCounters:rewards.counters}), board: next.board, nextId: next.nextId,
     random: next.random, nodeScore, validMoves, energy, cleared }
   if (!cleared && state.protocol === 'unstable-matrix' && validMoves % protocolGroups.mixed['unstable-matrix'].interval === 0) {
     // D07 candidate: an environmental shuffle commits one draw sequence even if values match.
     const shuffle = shuffleUnlockedTiles(updated.board,updated.random)
     events.push({type:'PROTOCOL_SHUFFLED',valuesChanged:shuffle.valuesChanged})
-    return { accepted:true as const, state:{ ...updated, board:shuffle.board, random:shuffle.random }, events }
+    updated = { ...updated, board:shuffle.board, random:shuffle.random }
+  }
+  if (!cleared) {
+    const collection = collectFullBoard(updated)
+    updated = collection.state
+    if (collection.event) events.push(collection.event)
   }
   return { accepted: true as const, state: updated, events }
 }

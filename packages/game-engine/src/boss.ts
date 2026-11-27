@@ -1,3 +1,4 @@
+import { collectFullBoard } from './garbage-collect'
 import { mergeRewards, type MergeCounters } from './merge-rewards'
 import { resolveSingleTarget, singleTargetIds, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 import { skills, spawnTuning, zeroConfig, type SkillId } from '@infinite/game-config'
@@ -17,6 +18,7 @@ export interface ZeroState {
   readonly nextId: number
   readonly energy: number
   readonly mergeCounters?: MergeCounters
+  readonly garbageCollected?: boolean
   readonly nodeScore: number
   readonly validMoves: number
 }
@@ -47,8 +49,9 @@ export function slideZero(state: ZeroState, direction: Direction) {
   const next = spawnOrdinaryTile(after, state.owned.includes('advanced-spawn'))
   const lock = state.lock && state.lock.remainingMoves > 1
     ? { ...state.lock, remainingMoves:state.lock.remainingMoves - 1 } : null
-  return { accepted:true as const, state:{ ...after, lock, board:next.board, nextId:next.nextId, random:next.random },
-    events:[...events, { type:'TILE_SPAWNED' as const, ...next.spawned }] }
+  const collection = collectFullBoard({ ...after, lock, board:next.board, nextId:next.nextId, random:next.random }, lock?.tileId)
+  return { accepted:true as const, state:collection.state,
+    events:[...events, { type:'TILE_SPAWNED' as const, ...next.spawned }, ...(collection.event ? [collection.event] : [])] }
 }
 
 /** The encounter clock invokes these stages when its timing policy requests them. */
