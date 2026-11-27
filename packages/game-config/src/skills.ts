@@ -25,3 +25,6 @@ export const spawnTuning = {
 } as const
 
 export const parallelCompute = { minimumPairs: 3, scoreFraction: 0.5, extraEnergy: 1 } as const
+
+export const continuousCompute = { requiredSlides: 3, bonusScore: 32 } as const
+export const energyRecycle = { requiredPairs: 8, bonusEnergy: 2 } as const

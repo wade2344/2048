@@ -1,4 +1,4 @@
-import { mergeRewards } from './merge-rewards'
+import { mergeRewards, type MergeCounters } from './merge-rewards'
 import { resolveSingleTarget, singleTargetIds, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 import { skills, spawnTuning, zeroConfig, type SkillId } from '@infinite/game-config'
 import { startLevelEnergy } from './energy'
@@ -16,6 +16,7 @@ export interface ZeroState {
   readonly random: RandomSnapshot
   readonly nextId: number
   readonly energy: number
+  readonly mergeCounters?: MergeCounters
   readonly nodeScore: number
   readonly validMoves: number
 }
@@ -35,10 +36,10 @@ export function slideZero(state: ZeroState, direction: Direction) {
   if (state.hp <= 0 || !['left','right','up','down'].includes(direction)) return { accepted: false as const, state }
   const move = moveBoard(state.board, direction, state.lock ? [state.lock.tileId] : [])
   if (!move.changed) return { accepted: false as const, state }
-  const { bonusScore, energy } = mergeRewards(move, state.energy, state.owned)
+  const { bonusScore, energy, counters } = mergeRewards(move, state.energy, state.owned, undefined, state.mergeCounters)
   const damage = move.score + bonusScore
   const hp = Math.max(0, state.hp - damage)
-  const after: ZeroState = { ...state, hp, board: move.board, energy,
+  const after: ZeroState = { ...state, ...(counters && {mergeCounters:counters}), hp, board: move.board, energy,
     nodeScore: state.nodeScore + damage, validMoves: state.validMoves + 1 }
   const damageEvents = damage ? [{ type:'BOSS_DAMAGED' as const, before:state.hp, after:hp, damage }] : []
   const events = [...move.events, ...damageEvents]

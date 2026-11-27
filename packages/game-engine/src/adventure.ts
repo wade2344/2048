@@ -1,4 +1,4 @@
-import { mergeRewards } from './merge-rewards'
+import { mergeRewards, type MergeCounters } from './merge-rewards'
 import { shuffleUnlockedTiles } from './shuffle'
 import { resolveSingleTarget, singleTargetIds, type TargetingContext, type SingleTargetSkill, type SingleTargetAction } from './single-target'
 export type { TargetingContext, SingleTargetSkill, SingleTargetAction } from './single-target'
@@ -21,6 +21,7 @@ export interface OrdinaryNodeState {
   readonly random: RandomSnapshot
   readonly energyRules: EnergyRules
   readonly energy: number
+  readonly mergeCounters?: MergeCounters
   readonly nodeScore: number
   readonly validMoves: number
   readonly cleared: boolean
@@ -94,7 +95,7 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
   if (!move.changed) return { accepted: false as const, state }
   const mergeScore = state.protocol === 'turbo-mode'
     ? move.score * beneficialProtocols['turbo-mode'].scoreMultiplier : move.score
-  const rewards = mergeRewards(move,state.energy,state.owned,state.energyRules)
+  const rewards = mergeRewards(move,state.energy,state.owned,state.energyRules,state.mergeCounters)
   // D03/D05 review candidate: turbo and parallel each use the unmodified merge score.
   const nodeScore = state.nodeScore + mergeScore + rewards.bonusScore
   const validMoves = state.validMoves + 1
@@ -114,7 +115,7 @@ export function slideOrdinaryNode(state: OrdinaryNodeState, direction: Direction
     next = spawnFixedTile(next,fast.extraValue)
     events.push({ type:'TILE_SPAWNED', ...next.spawned })
   }
-  const updated: OrdinaryNodeState = { ...state, board: next.board, nextId: next.nextId,
+  const updated: OrdinaryNodeState = { ...state, ...(rewards.counters && {mergeCounters:rewards.counters}), board: next.board, nextId: next.nextId,
     random: next.random, nodeScore, validMoves, energy, cleared }
   if (!cleared && state.protocol === 'unstable-matrix' && validMoves % protocolGroups.mixed['unstable-matrix'].interval === 0) {
     // D07 candidate: an environmental shuffle commits one draw sequence even if values match.
