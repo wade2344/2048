@@ -23,6 +23,7 @@ export interface OrdinaryNodeState {
   readonly energyRules: EnergyRules
   readonly energy: number
   readonly mergeCounters?: MergeCounters
+  readonly emergencyRestartUsed?: boolean
   readonly garbageCollected?: boolean
   readonly nodeScore: number
   readonly validMoves: number

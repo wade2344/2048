@@ -28,3 +28,4 @@ export const parallelCompute = { minimumPairs: 3, scoreFraction: 0.5, extraEnerg
 
 export const continuousCompute = { requiredSlides: 3, bonusScore: 32 } as const
 export const energyRecycle = { requiredPairs: 8, bonusEnergy: 2 } as const
+export const emergencyRestart = { removeCount: 4 } as const

@@ -18,6 +18,7 @@ export interface ZeroState {
   readonly nextId: number
   readonly energy: number
   readonly mergeCounters?: MergeCounters
+  readonly emergencyRestartUsed?: boolean
   readonly garbageCollected?: boolean
   readonly nodeScore: number
   readonly validMoves: number

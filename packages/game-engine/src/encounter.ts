@@ -1,6 +1,7 @@
 import { shuffleUnlockedTiles } from './shuffle'
 import { swapTargets } from './single-target'
-import { skills } from '@infinite/game-config'
+import { legalSlides } from './classic'
+import { emergencyRestart, skills } from '@infinite/game-config'
 import { slideOrdinaryNode, useSingleTargetSkill, type OrdinaryNodeState, type SingleTargetAction } from './adventure'
 import { slideZero, useZeroTargetSkill, type ZeroState } from './boss'
 import type { Direction } from './move'
@@ -22,8 +23,9 @@ export interface Encounter {
   readonly actions:readonly EncounterAction[]
 }
 
-export function startEncounter(node:Node): Encounter {
-  return { node, beforeMove:null, actions:[] }
+export function startEncounter(node:Node, previous?: Encounter): Encounter {
+  const entered = previous?.node.emergencyRestartUsed ? { ...node, emergencyRestartUsed:true } : node
+  return { node:entered, beforeMove:null, actions:[] }
 }
 
 const rebuildCost = skills.find(skill => skill.id === 'matrix-rebuild')!.baseCost
@@ -64,7 +66,7 @@ function swap(encounter:Encounter, action:SwapAction) {
     first:{ id:first.tile.id, row:first.row, col:first.col }, second:{ id:second.tile.id, row:second.row, col:second.col } }] }
 }
 
-export function dispatchEncounter(encounter:Encounter, action:EncounterAction) {
+function applyAction(encounter:Encounter, action:EncounterAction) {
   const { node, beforeMove } = encounter
   const rejected = { accepted:false as const, encounter }
   if (!action || (action.type !== 'MOVE' && action.type !== 'USE_SKILL')) return rejected
@@ -96,4 +98,24 @@ export function dispatchEncounter(encounter:Encounter, action:EncounterAction) {
     !('hp' in result.state ? result.state.hp <= 0 : result.state.cleared)
   return { accepted:true as const, encounter:{ node:result.state, beforeMove:retain ? node : null,
     actions:[...encounter.actions,action] }, events:result.events }
+}
+
+/** D08 candidate: after a committed action, resolve automatic rescue before manual rescue. */
+export function dispatchEncounter(encounter:Encounter, action:EncounterAction) {
+  const result = applyAction(encounter,action)
+  if (!result.accepted) return result
+  const { node } = result.encounter
+  if (node.emergencyRestartUsed || !node.owned.includes('emergency-restart') ||
+    ('hp' in node ? node.hp <= 0 : node.cleared)) return result
+  const lockedId = 'lock' in node ? node.lock?.tileId : undefined
+  if (legalSlides(node.board,lockedId ? [lockedId] : []).length) return result
+  // Stable row-major tie breaking and up-to-four removal are D05 review candidates.
+  const removed = node.board.flatMap((line,row) => line.flatMap((tile,col) =>
+    tile && 'value' in tile && tile.id !== lockedId ? [{tile,row,col}] : []))
+    .sort((a,b) => a.tile.value-b.tile.value).slice(0,emergencyRestart.removeCount)
+  if (!removed.length) return result
+  const board = node.board.map(line=>[...line])
+  for (const {row,col} of removed) board[row]![col] = null
+  return { ...result, encounter:{ ...result.encounter, node:{ ...node,board,emergencyRestartUsed:true } },
+    events:[...result.events,{ type:'EMERGENCY_RESTART' as const, removed }] }
 }
